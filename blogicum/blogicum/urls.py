@@ -21,8 +21,8 @@ from django.contrib.auth.forms import UserCreationForm
 from django.views.generic.edit import CreateView
 from django.urls import path, include, reverse_lazy
 
-handler404 = 'pages.views.handler404'  
-handler500 = 'pages.views.handler500'  
+handler404 = 'pages.views.handler404'
+handler500 = 'pages.views.handler500'
 
 urlpatterns = [
     path("", include("blog.urls")),
@@ -30,7 +30,7 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path('auth/', include('django.contrib.auth.urls')),
     path(
-        'auth/registration/', 
+        'auth/registration/',
         CreateView.as_view(
             template_name='registration/registration_form.html',
             form_class=UserCreationForm,
@@ -38,7 +38,7 @@ urlpatterns = [
         ),
         name='registration',
     ),
-] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT) 
+] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 if settings.DEBUG:
     import debug_toolbar

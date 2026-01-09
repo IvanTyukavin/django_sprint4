@@ -23,7 +23,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = "django-insecure-g48#=kj4)#3##1v^o1ehd^ttq8*4u!#0a)owidc0@n(w=w-3l!"
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
 ALLOWED_HOSTS = [
     'localhost',
@@ -31,9 +31,9 @@ ALLOWED_HOSTS = [
     # Когда проект будет опубликован и станет доступен для пользователей,
     # в этот список нужно будет добавить и адреса домена, где он будет размещён,
     # например 'acme.not' и 'www.acme.not'
-] 
+]
 
-CSRF_FAILURE_VIEW = 'pages.views.csrf_failure' 
+CSRF_FAILURE_VIEW = 'pages.views.csrf_failure'
 
 # DEBUG = True
 
@@ -159,6 +159,6 @@ INTERNAL_IPS = [
 # Подключаем бэкенд filebased.EmailBackend:
 EMAIL_BACKEND = 'django.core.mail.backends.filebased.EmailBackend'
 # Указываем директорию, в которую будут сохраняться файлы писем:
-EMAIL_FILE_PATH = BASE_DIR / 'sent_emails' 
+EMAIL_FILE_PATH = BASE_DIR / 'sent_emails'
 
-MEDIA_ROOT = BASE_DIR / 'media' 
+MEDIA_ROOT = BASE_DIR / 'media'

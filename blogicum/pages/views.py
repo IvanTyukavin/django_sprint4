@@ -9,6 +9,7 @@ class AboutPage(TemplateView):
         context = super().get_context_data(**kwargs)
         return context
 
+
 class RulesPage(TemplateView):
     template_name = 'pages/rules.html'
 
@@ -16,14 +17,13 @@ class RulesPage(TemplateView):
         context = super().get_context_data(**kwargs)
         return context
 
+
 def csrf_failure(request, reason=''):
-    return render(request, 'pages/403csrf.html', status=403) 
+    return render(request, 'pages/403csrf.html', status=403)
 
 
 def handler404(request, exception=None):
-    """
-    Кастомная страница ошибки 404 (Страница не найдена)
-    """
+    """Кастомная страница ошибки 404 (Страница не найдена)"""
     context = {
         'exception': str(exception) if exception else None
     }
@@ -31,8 +31,5 @@ def handler404(request, exception=None):
 
 
 def handler500(request):
-    """
-    Кастомная страница ошибки 500 (Ошибка сервера)
-    """
+    """Кастомная страница ошибки 500 (Ошибка сервера)"""
     return render(request, 'pages/500.html', status=500)
-
