@@ -45,4 +45,8 @@ class PostForm(forms.ModelForm):
         # Указываем модель, на основе которой должна строиться форма.
         model = Post
         exclude = ("created_ad", "author")
-        widgets = {"pub_date": forms.DateInput(attrs={"type": "date"})}
+        widgets = {
+            'pub_date': forms.DateTimeInput(
+                format='%Y-%m-%d %H:%M', attrs={'type': 'datetime-local'}
+            )
+        }
