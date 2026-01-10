@@ -1,0 +1,307 @@
+# blogicum/blog/views.py
+from django.views.generic import UpdateView, DeleteView
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.shortcuts import render, get_object_or_404, redirect
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth import get_user_model
+from django.http import Http404
+from django.urls import reverse_lazy
+from django.core.paginator import Paginator
+from django.db.models import Count
+from django.utils import timezone
+from .forms import PostForm, ProfileEditForm, CommentForm
+from .models import Post, Category, Comment
+
+User = get_user_model()
+
+
+def index(request):
+    """Главная страница - лента записей (index.html)"""
+    post_list = Post.objects.filter(
+        is_published=True,
+        category__is_published=True,
+        pub_date__lte=timezone.now()
+    ).select_related(
+        'author', 'category', 'location'
+    ).annotate(
+        comment_count=Count('comments')
+    ).order_by('-pub_date')
+
+    paginator = Paginator(post_list, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    return render(request, 'blog/index.html', {'page_obj': page_obj})
+
+
+def post_detail(request, pk):
+    """Детальная страница поста (detail.html)"""
+    post = get_object_or_404(Post, pk=pk)
+
+    # Проверка доступа: автор видит все, остальные — только опубликованные
+    if (post.author != request.user
+        and (not post.is_published
+             or not post.category.is_published
+             or post.pub_date > timezone.now())):
+        raise Http404("Пост не найден или недоступен")
+
+    if request.method == 'POST' and request.user.is_authenticated:
+        form = CommentForm(request.POST)
+        if form.is_valid():
+            comment = form.save(commit=False)
+            comment.author = request.user
+            comment.post = post
+            comment.save()
+            return redirect('blog:post_detail', pk=pk)
+    else:
+        form = CommentForm()
+
+    comments = post.comments.select_related('author').all()
+
+    return render(
+        request,
+        'blog/detail.html',
+        {
+            'post': post,
+            'form': form,
+            'comments': comments
+        }
+    )
+
+
+def category_posts(request, category_slug):
+    """Публикации в категории (category.html)"""
+    category = get_object_or_404(
+        Category,
+        slug=category_slug,
+        is_published=True
+    )
+
+    post_list = Post.objects.filter(
+        category=category,
+        is_published=True,
+        category__is_published=True,
+        pub_date__lte=timezone.now()
+    ).select_related(
+        'author', 'category', 'location'
+    ).annotate(
+        comment_count=Count('comments')
+    ).order_by('-pub_date')
+
+    paginator = Paginator(post_list, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    return render(
+        request,
+        'blog/category.html',
+        {
+            'page_obj': page_obj,
+            'category': category
+        }
+    )
+
+
+def profile(request, username):
+    """Страница пользователя (profile.html)"""
+    profile_user = get_object_or_404(User, username=username)
+
+    post_list = Post.objects.select_related(
+        'author', 'location', 'category'
+    ).annotate(
+        comment_count=Count('comments')
+    ).filter(author=profile_user).order_by('-pub_date')
+
+    if request.user != profile_user:
+        post_list = post_list.filter(
+            is_published=True,
+            category__is_published=True,
+            pub_date__lte=timezone.now()
+        )
+
+    paginator = Paginator(post_list, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    return render(
+        request,
+        'blog/profile.html',
+        {
+            'page_obj': page_obj,
+            'profile': profile_user
+        }
+    )
+
+
+@login_required
+def create_post(request):
+    """Создание новой публикации (create.html)"""
+    if request.method == 'POST':
+        form = PostForm(request.POST, request.FILES)
+        if form.is_valid():
+            post = form.save(commit=False)
+            post.author = request.user
+            post.save()
+            return redirect('blog:profile', username=request.user.username)
+    else:
+        form = PostForm()
+
+    return render(request, 'blog/create.html', {'form': form})
+
+
+@login_required
+def edit_post(request, pk):
+    """Редактирование публикации (create.html)"""
+    post = get_object_or_404(Post, pk=pk)
+
+    if request.user != post.author:
+        return redirect('blog:post_detail', pk)
+
+    if request.method == 'POST':
+        form = PostForm(request.POST, request.FILES, instance=post)
+        if form.is_valid():
+            form.save()
+            return redirect('blog:post_detail', pk=post.pk)
+    else:
+        form = PostForm(instance=post)
+
+    return render(request, 'blog/create.html', {'form': form})
+
+
+@login_required
+def delete_post(request, pk):
+    """Удаление публикации (create.html)"""
+    post = get_object_or_404(Post, pk=pk)
+
+    if request.user != post.author:
+        raise Http404("У вас нет прав на удаление этого поста.")
+
+    if request.method == 'POST':
+        post.delete()
+        return redirect('blog:index')
+
+    return render(request, 'blog/create.html', {'form': {'instance': post}})
+
+
+@login_required
+def edit_profile(request):
+    """Редактирование профиля (user.html)"""
+    user = request.user
+
+    if request.method == 'POST':
+        form = ProfileEditForm(request.POST, instance=user)
+        if form.is_valid():
+            form.save()
+            return redirect('blog:profile', username=user.username)
+    else:
+        form = ProfileEditForm(instance=user)
+
+    return render(request, 'blog/user.html', {'form': form})
+
+
+@login_required
+def add_comment(request, pk):
+    """Добавление комментария"""
+    post = get_object_or_404(Post, pk=pk)
+    form = CommentForm(request.POST or None)
+    if form.is_valid():
+        comment = form.save(commit=False)
+        comment.author = request.user
+        comment.post = post
+        comment.save()
+    return redirect('blog:post_detail', pk=pk)
+
+
+class CommentUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
+    model = Comment
+    form_class = CommentForm
+    template_name = 'blog/comment.html'
+
+    def test_func(self):
+        comment = self.get_object()
+        return self.request.user == comment.author
+
+    def get_success_url(self):
+        return reverse_lazy(
+            'blog:post_detail',
+            kwargs={'pk': self.object.post.pk}
+        )
+
+
+class CommentDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
+    model = Comment
+    template_name = 'blog/comment.html'
+
+    def test_func(self):
+        comment = self.get_object()
+        return self.request.user == comment.author
+
+    def get_success_url(self):
+        return reverse_lazy(
+            'blog:post_detail',
+            kwargs={'pk': self.object.post.pk}
+        )
+
+
+from django.urls import path
+from . import views
+
+app_name = "blog"
+
+urlpatterns = [
+    path(
+        '',
+        views.index,
+        name='index',
+    ),
+    path(
+        'posts/<int:pk>/',
+        views.post_detail,
+        name='post_detail',
+    ),
+    path(
+        'posts/<int:pk>/edit/',
+        views.edit_post,
+        name='edit_post',
+    ),
+    path(
+        'posts/create/',
+        views.create_post,
+        name='create_post',
+    ),
+    path(
+        'posts/<int:pk>/delete/',
+        views.delete_post,
+        name='delete_post',
+    ),
+    path(
+        'posts/<int:pk>/comment/',
+        views.add_comment,
+        name='add_comment',
+    ),
+    path(
+        'posts/<int:post_id>/edit_comment/<int:pk>/',
+        views.CommentUpdateView.as_view(),
+        name='edit_comment'
+    ),
+    path(
+        'posts/<int:post_id>/delete_comment/<int:pk>/',
+        views.CommentDeleteView.as_view(),
+        name='delete_comment'
+    ),
+    path(
+        'category/<slug:category_slug>/',
+        views.category_posts,
+        name='category_posts',
+    ),
+    path(
+        'profile/edit/',
+        views.edit_profile,
+        name='edit_profile',
+    ),
+    path(
+        'profile/<str:username>/',
+        views.profile,
+        name='profile',
+    ),
+]

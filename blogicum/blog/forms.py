@@ -10,7 +10,7 @@ BEATLES = {"Джон Леннон", "Пол Маккартни", "Джордж �
 class UserForm(forms.ModelForm):
     class Meta:
         model = User
-        fields = ["first_name", "last_name", "email", "username"]
+        fields = ("first_name", "last_name", "email", "username")
 
     def clean_first_name(self):
         first_name = self.cleaned_data["first_name"]

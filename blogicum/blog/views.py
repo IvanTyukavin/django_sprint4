@@ -135,16 +135,28 @@ class PostCreateView(LoginRequiredMixin, CreateView):
         )
 
 
-class PostUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
+class PostUpdateView(LoginRequiredMixin, UpdateView):
     """Редактирование публикации (create.html)"""
 
     model = Post
     form_class = PostForm
     template_name = 'blog/create.html'
 
-    def test_func(self):
-        post = self.get_object()
-        return self.request.user == post.author
+    def dispatch(self, request, *args, **kwargs):
+        """Проверка прав доступа перед выполнением любого метода"""
+        post = get_object_or_404(Post, pk=self.kwargs['pk'])
+
+        if request.user != post.author:
+            return redirect('blog:post_detail', pk=post.pk)
+
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form_kwargs(self):
+        """Передаем файлы в форму"""
+        kwargs = super().get_form_kwargs()
+        if self.request.method == 'POST':
+            kwargs['files'] = self.request.FILES
+        return kwargs
 
     def get_success_url(self):
         return reverse_lazy('blog:post_detail', kwargs={'pk': self.object.pk})
